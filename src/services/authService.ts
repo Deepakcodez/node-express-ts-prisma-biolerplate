@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 
 export class AuthService {
   static async register(data: RegisterRequest): Promise<AuthResponse> {
-    const { username, email, password, phone } = data;
+    const { email, password, firstName, lastName } = data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -32,8 +32,8 @@ export class AuthService {
       data: {
         email,
         password: hashedPassword,
-        username,
-        phone,
+        firstName,
+        lastName,
       },
     });
 
@@ -47,8 +47,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        username: user.username,
-        phone: user.phone,
+        firstName: user.firstName || undefined,
+        lastName: user.lastName || undefined,
       },
       token,
     };
@@ -56,8 +56,7 @@ export class AuthService {
 
   static async login(data: LoginRequest): Promise<AuthResponse> {
     const { email, password } = data;
-    console.log("email", email);
-    
+
     // Find user
     const user = await prisma.user.findUnique({
       where: { email },
@@ -65,6 +64,10 @@ export class AuthService {
 
     if (!user) {
       throw new NotFoundError("User not found");
+    }
+
+    if (!user.isActive) {
+      throw new AuthenticationError("Account is deactivated");
     }
 
     // Verify password
@@ -83,8 +86,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        username: user.username,
-        phone: user.phone,
+        firstName: user.firstName || undefined,
+        lastName: user.lastName || undefined,
       },
       token,
     };
@@ -96,7 +99,9 @@ export class AuthService {
       select: {
         id: true,
         email: true,
-        username: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
         createdAt: true,
         updatedAt: true,
       },

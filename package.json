@@ -1,5 +1,5 @@
 {
-  "name": "backend",
+  "name": "express-auth-backend",
   "version": "1.0.0",
   "description": "TypeScript Express backend with Prisma and authentication",
   "main": "dist/server.js",
