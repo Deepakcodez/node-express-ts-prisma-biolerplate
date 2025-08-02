@@ -15,5 +15,6 @@ router.get("/health", (req, res) => {
 
 // API routes
 router.use("/auth", authRoutes);
+router.use("/category", authRoutes);
 
 export default router;

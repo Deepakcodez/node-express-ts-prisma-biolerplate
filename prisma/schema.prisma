@@ -1,22 +1,222 @@
 generator client {
     provider = "prisma-client-js"
+    binaryTargets = ["native", "debian-openssl-1.1.x"]    
 }
 
 datasource db {
     provider = "mysql"
     url      = env("DATABASE_URL")
-    // binaryTargets = ["native", "debian-openssl-1.1.x"]     for c panel   
+}
+
+// Enums
+
+enum Role {
+    ADMIN
+    USER
+}
+
+enum OrderStatus {
+    pending
+    processing
+    delivered
+    cancelled
+}
+
+enum PaymentMethod {
+    cash_on_delivery
+    online
+}
+
+enum PaymentStatus {
+    Pending
+    Success
+    Failed
 }
 
 model User {
-    id        String   @id @default(cuid())
-    email     String   @unique
-    password  String
-    firstName String?
-    lastName  String?
-    isActive  Boolean  @default(true)
+    id                  String    @id @default(uuid())
+    username            String    @unique @db.VarChar(255)
+    email               String    @unique @db.VarChar(255)
+    phone               String    @unique
+    password            String    @db.VarChar(255)
+    role                Role      @default(USER)
+    address             Address[]
+    addressId           Int?
+    orders              Order[]
+    resetPasswordToken  String?   @db.VarChar(255)
+    resetPasswordExpire DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+    Payment             Payment[]
+
+    @@index([email])
+    @@index([username])
+}
+
+model Address {
+    id      String  @id @default(cuid())
+    street  String? @db.VarChar(255)
+    city    String? @db.VarChar(255)
+    state   String? @db.VarChar(255)
+    zipCode String? @db.VarChar(20)
+    country String? @db.VarChar(100)
+    user    User?   @relation(fields: [userId], references: [id])
+    userId  String?
+    Order   Order[]
+}
+
+model Order {
+    id                   String         @id @default(uuid())
+    quantity             Int?
+    clientId             String?
+    client               User?          @relation(fields: [clientId], references: [id])
+    addressId            String
+    address              Address        @relation(fields: [addressId], references: [id])
+    totalPrice           Float
+    totalQuantity        Int
+    deliveryCharges      Float          @default(0)
+    status               OrderStatus?
+    paymentMethod        PaymentMethod?
+    expectedDeliveryDate DateTime?
+    isPaid               Boolean        @default(false)
+
+    razorpayOrderId   String?       @map("razorpay_order_id")
+    razorpayPaymentId String?       @map("razorpay_payment_id")
+    razorpaySignature String?       @map("razorpay_signature")
+    paymentStatus     PaymentStatus @default(Pending)
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    @@map("users")
+    orderItems OrderItem[]
+    Payment    Payment[]
+}
+
+model OrderItem {
+    id        String  @id @default(uuid())
+    orderId   String
+    order     Order   @relation(fields: [orderId], references: [id])
+    productId String
+    product   Product @relation(fields: [productId], references: [id])
+    price     Float
+    quantity  Int
+
+    @@index([productId])
+}
+
+model Product {
+    id                  String @id @default(cuid())
+    name                String
+    shortDescription    String
+    detailedDescription String
+    price               Float
+    originalPrice       Float
+    discount            Float
+    tax                 Float
+
+    categoryId String?
+    category   Category? @relation(fields: [categoryId], references: [id])
+
+    subcategoryId String?
+    subcategory   SubCategory? @relation(fields: [subcategoryId], references: [id])
+
+    sizeId String?
+    size   Size?   @relation(fields: [sizeId], references: [id])
+
+    qualityId String?
+    quality   Quality? @relation(fields: [qualityId], references: [id])
+
+    colors Color[]
+
+    images ProductImage[]
+
+    createdAt DateTime    @default(now())
+    updatedAt DateTime    @updatedAt
+    OrderItem OrderItem[]
+
+    @@index([categoryId])
+    @@index([subcategoryId])
+    @@index([sizeId])
+    @@index([qualityId])
+}
+
+model ProductImage {
+    id        String  @id @default(cuid())
+    productId String
+    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+    publicId  String
+    url       String
+    rank      Int     @default(0)
+}
+
+model Payment {
+    id Int @id @default(autoincrement())
+
+    orderId String
+    order   Order  @relation(fields: [orderId], references: [id])
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    amount        Float
+    paymentMethod PaymentMethod @default(cash_on_delivery)
+    paymentStatus PaymentStatus @default(Pending)
+
+    razorpayOrderId   String @map("razorpay_order_id")
+    razorpayPaymentId String @map("razorpay_payment_id")
+    razorpaySignature String @map("razorpay_signature")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([orderId])
+    @@index([userId])
+}
+
+model Category {
+    id            String        @id @default(cuid())
+    name          String
+    subcategories SubCategory[] // One-to-many relation
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    Product   Product[]
+    Size      Size[]
+}
+
+model SubCategory {
+    id             String    @id @default(cuid())
+    name           String
+    parentCategory String
+    category       Category  @relation(fields: [parentCategory], references: [id])
+    Product        Product[]
+}
+
+model Color {
+    id       String    @id @default(cuid())
+    name     String
+    products Product[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Quality {
+    id   String @id @default(cuid())
+    name String
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    Product   Product[]
+}
+
+model  Size {
+    id         String    @id @default(cuid())
+    name       String
+    categoryId String?
+    category   Category? @relation(fields: [categoryId], references: [id])
+
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+    Product   Product[]
 }
